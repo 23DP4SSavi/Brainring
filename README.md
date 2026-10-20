@@ -19,6 +19,13 @@ Parolei jābūt vismaz 8 rakstzīmēm. Jaunam kontam ir prototipa parauga modin�
 6:30 darba dienās un 8:15 sestdienā. Katrs lietotājs redz tikai savus modinātājus.
 Projektā nav iepriekš izveidota demo konta; pirmajā palaišanā izveido jaunu kontu.
 
+Minimālais administratora konts tiek izveidots automātiski:
+- e-pasts: `test@admin.lv`
+- parole: `admin123123`
+
+Ja vajag citus datus, iestati vides mainīgos `BRAINRING_ADMIN_EMAIL` un
+`BRAINRING_ADMIN_PASSWORD` pirms backend palaišanas.
+
 ## Darbs ar kodu
 
 Atver divus termināļus projekta saknes mapē.
