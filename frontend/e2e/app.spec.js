@@ -110,18 +110,9 @@ test('prototype views, registration, saved alarm CRUD, challenge, reload, and lo
     fullPage: true,
   })
   await noOverflow(page)
-<<<<<<< HEAD
-  await page
-    .getByRole('button', { name: 'A Tralalero Tralala', exact: true })
-    .click()
-  await expect(page.getByRole('alert')).toContainText(
-    'Incorrect answer. Please try again.',
-  )
-=======
   await page.getByLabel('Character name', { exact: true }).fill('Tralalero Tralala')
   await page.getByRole('button', { name: 'Check answer', exact: true }).click()
   await expect(page.getByRole('alert')).toContainText('Incorrect answer')
->>>>>>> a3594635754320c4c288c5a9def461f879e732a2
   await page.reload()
   await expect(
     page.getByRole('heading', { name: 'who dis?!', exact: true }),
@@ -140,11 +131,7 @@ test('prototype views, registration, saved alarm CRUD, challenge, reload, and lo
     .click()
   await page.getByRole('button', { name: 'sign out', exact: false }).click()
   await page.getByLabel('Your email', { exact: true }).fill(email)
-<<<<<<< HEAD
-  await page.getByLabel('Password', { exact: true }).fill('test-password-123')
-=======
   await page.getByLabel('Password', { exact: true }).fill('Strong_123')
->>>>>>> a3594635754320c4c288c5a9def461f879e732a2
   await page.getByRole('button', { name: 'Sign in', exact: true }).click()
   await expect(page.locator('.alarm-card')).toHaveCount(2)
   await page.setViewportSize({ width: 320, height: 740 })
@@ -164,12 +151,6 @@ test('scheduled weekday alarm fires; one-time easy alarm disables itself', async
   await page.getByLabel('Character name', { exact: true }).fill('Tung Tung Tung Sahur')
   await page.getByRole('button', { name: 'Check answer', exact: true }).click()
   await page
-<<<<<<< HEAD
-    .getByRole('button', { name: 'C Tung Tung Tung Sahur', exact: true })
-    .click()
-  await page
-=======
->>>>>>> a3594635754320c4c288c5a9def461f879e732a2
     .getByRole('button', { name: 'Back to alarms', exact: false })
     .click()
   await page.getByRole('button', { name: '+ add alarm', exact: true }).click()

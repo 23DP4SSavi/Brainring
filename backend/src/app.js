@@ -10,6 +10,36 @@ const deriveKey = promisify(scrypt)
 const hash = (value) => createHash('sha256').update(value).digest('hex')
 const sessionAge = 30 * 24 * 60 * 60
 const attempts = new Map()
+const defaultAdminEmail = (
+  process.env.BRAINRING_ADMIN_EMAIL || 'test@admin.lv'
+)
+  .trim()
+  .toLowerCase()
+const defaultAdminPassword =
+  process.env.BRAINRING_ADMIN_PASSWORD || 'admin123123'
+
+async function ensureDefaultAdmin() {
+  if (!defaultAdminEmail || !defaultAdminPassword) return
+  const existing = db
+    .prepare('SELECT id, is_admin FROM users WHERE email = ?')
+    .get(defaultAdminEmail)
+  if (existing) {
+    if (!existing.is_admin)
+      db.prepare('UPDATE users SET is_admin = 1 WHERE id = ?').run(existing.id)
+  } else {
+    const salt = randomBytes(16).toString('hex')
+    const key = await deriveKey(defaultAdminPassword, salt, 64)
+    db.prepare(
+      'INSERT INTO users (email, password_hash, salt, is_admin) VALUES (?, ?, ?, 1)',
+    ).run(defaultAdminEmail, key.toString('hex'), salt)
+  }
+  db.prepare('UPDATE users SET is_admin = 0 WHERE email <> ?').run(
+    defaultAdminEmail,
+  )
+}
+
+await ensureDefaultAdmin()
+
 app.disable('x-powered-by')
 app.use(express.json({ limit: '10kb' }))
 app.use((req, res, next) => {
@@ -40,14 +70,24 @@ app.use('/api', (req, res, next) => {
   if (token)
     req.user = db
       .prepare(
-        'SELECT users.id, users.email FROM sessions JOIN users ON users.id = sessions.user_id WHERE token_hash = ? AND expires_at > ?',
+        'SELECT users.id, users.email, users.is_admin AS isAdmin FROM sessions JOIN users ON users.id = sessions.user_id WHERE token_hash = ? AND expires_at > ?',
       )
       .get(hash(token), Date.now())
+  if (req.user) req.user.isAdmin = Boolean(req.user.isAdmin)
   next()
 })
 function authenticated(req, res, next) {
   if (!req.user)
     return res.status(401).json({ error: 'Please sign in to continue.' })
+  next()
+}
+function adminOnly(req, res, next) {
+  if (!req.user)
+    return res.status(401).json({ error: 'Please sign in to continue.' })
+  if (!req.user.isAdmin)
+    return res
+      .status(403)
+      .json({ error: 'Administrator access is required.' })
   next()
 }
 function limitAuth(req, res, next) {
@@ -129,7 +169,7 @@ app.post('/api/auth/register', limitAuth, async (req, res) => {
         .json({ error: 'An account with this email already exists.' })
     throw error
   }
-  const user = { id, email }
+  const user = { id, email, isAdmin: false }
   createSession(req, res, user, req.body.remember === true)
   res.status(201).json({ user })
 })
@@ -146,7 +186,7 @@ app.post('/api/auth/login', limitAuth, async (req, res) => {
   if (!user || !timingSafeEqual(key, Buffer.from(user.password_hash, 'hex')))
     return res.status(401).json({ error: 'Email or password is incorrect.' })
   createSession(req, res, user, req.body.remember === true)
-  res.json({ user: { id: user.id, email: user.email } })
+  res.json({ user: { id: user.id, email: user.email, isAdmin: !!user.is_admin } })
 })
 app.post('/api/auth/logout', (req, res) => {
   const token = cookieToken(req)
@@ -162,6 +202,38 @@ app.post('/api/auth/logout', (req, res) => {
 app.get('/api/auth/me', authenticated, (req, res) =>
   res.json({ user: req.user }),
 )
+app.get('/api/admin/users', authenticated, adminOnly, (req, res) => {
+  const query =
+    typeof req.query.q === 'string' ? req.query.q.trim().toLowerCase() : ''
+  const users = db
+    .prepare('SELECT id, email, is_admin AS isAdmin FROM users ORDER BY id')
+    .all()
+    .map((user) => ({
+      ...user,
+      isAdmin: Boolean(user.isAdmin),
+    }))
+  if (!query) return res.json(users)
+  res.json(users.filter((user) => user.email.toLowerCase().includes(query)))
+})
+app.delete('/api/admin/users/:id', authenticated, adminOnly, (req, res) => {
+  const userId = Number(req.params.id)
+  if (!Number.isInteger(userId) || userId < 1)
+    return res.status(400).json({ error: 'Invalid user id.' })
+  const target = db
+    .prepare('SELECT id, is_admin AS isAdmin FROM users WHERE id = ?')
+    .get(userId)
+  if (!target) return res.status(404).json({ error: 'User not found.' })
+  if (target.isAdmin)
+    return res
+      .status(400)
+      .json({ error: 'Administrator accounts cannot be deleted here.' })
+  if (target.id === req.user.id)
+    return res
+      .status(400)
+      .json({ error: 'You cannot delete your own account.' })
+  db.prepare('DELETE FROM users WHERE id = ?').run(target.id)
+  res.status(204).end()
+})
 const serializeAlarm = (alarm) => ({
   ...alarm,
   days: JSON.parse(alarm.days),

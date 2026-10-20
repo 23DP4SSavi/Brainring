@@ -8,7 +8,7 @@ const directory = mkdtempSync(join(tmpdir(), 'brainring-api-'))
 process.env.DATABASE_PATH = join(directory, 'test.sqlite')
 const { app } = await import('../src/app.js')
 const { db } = await import('../src/database.js')
-let server, base, cookie, otherCookie, alarmId, challengeId
+let server, base, cookie, otherCookie, adminCookie, alarmId, challengeId
 async function request(
   path,
   { method = 'GET', body, session = cookie, origin } = {},
@@ -93,6 +93,43 @@ test('registration validates input, hashes passwords, and creates prototype alar
       })
     ).status,
     409,
+  )
+})
+test('admin account can sign in and use protected admin users API', async () => {
+  assert.equal((await request('/admin/users', { session: null })).status, 401)
+  assert.equal((await request('/admin/users')).status, 403)
+  const adminLogin = await request('/auth/login', {
+    method: 'POST',
+    body: { email: 'test@admin.lv', password: 'admin123123' },
+  })
+  assert.equal(adminLogin.status, 200)
+  assert.equal(adminLogin.body.user.isAdmin, true)
+  adminCookie = adminLogin.cookie
+  const users = await request('/admin/users', { session: adminCookie })
+  assert.equal(users.status, 200)
+  assert.equal(users.body.some((user) => user.email === 'first@example.com'), true)
+  const removable = await request('/auth/register', {
+    method: 'POST',
+    body: { email: 'delete-me@example.com', password: 'password123' },
+  })
+  assert.equal(removable.status, 201)
+  const beforeDelete = await request('/admin/users', { session: adminCookie })
+  const removeTarget = beforeDelete.body.find(
+    (user) => user.email === 'delete-me@example.com',
+  )
+  assert.ok(removeTarget)
+  assert.equal(
+    (await request(`/admin/users/${removeTarget.id}`, { method: 'DELETE', session: adminCookie })).status,
+    204,
+  )
+  assert.equal(
+    (
+      await request('/auth/login', {
+        method: 'POST',
+        body: { email: 'delete-me@example.com', password: 'password123' },
+      })
+    ).status,
+    401,
   )
 })
 test('alarm CRUD validates and persists SQL data', async () => {
