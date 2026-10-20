@@ -3,6 +3,13 @@ import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { api } from './api'
 import { useAlarmSound } from './audio'
 
+const theme = ref(document.documentElement.dataset.theme || 'light')
+function toggleTheme() {
+  theme.value = theme.value === 'dark' ? 'light' : 'dark'
+  document.documentElement.dataset.theme = theme.value
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme.value === 'dark' ? '#111111' : '#f5f5f5')
+  try { localStorage.setItem('brainring-theme', theme.value) } catch { /* Storage is optional. */ }
+}
 const user = ref(null)
 const view = ref('login')
 const booting = ref(true)
@@ -270,7 +277,7 @@ async function answer(index) {
       alarms.value = await api('/alarms')
     } else {
       wrongAnswer.value = index
-      answerError.value = 'not quite! give that brain another try.'
+      answerError.value = 'Incorrect answer. Please try again.'
     }
   } catch (cause) {
     answerError.value = cause.message
@@ -365,7 +372,7 @@ onUnmounted(() => {
           ><span class="wordmark-star" aria-hidden="true">✳</span></a
         >
         <span v-if="!user" class="header-note"
-          >a wake-up call for your brain.</span
+          >A clearer start to your day.</span
         >
         <button
           v-else-if="view === 'home'"
@@ -375,7 +382,16 @@ onUnmounted(() => {
         >
           sign out <span aria-hidden="true">↗</span>
         </button>
-        <span v-else class="header-note">rise. think. shine.</span>
+        <span v-else class="header-note">Start your day with focus.</span>
+        <button
+          type="button"
+          class="theme-toggle"
+          :aria-pressed="theme === 'dark'"
+          :aria-label="theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
+          @click="toggleTheme"
+        >
+          {{ theme === 'dark' ? 'White mode' : 'Black mode' }}
+        </button>
       </header>
       <main v-if="!user" class="auth-stage">
         <div class="auth-card paper-card">
@@ -387,11 +403,11 @@ onUnmounted(() => {
             height="176"
           />
           <span class="doodle auth-star" aria-hidden="true">✧</span>
-          <h1>{{ view === 'register' ? 'join the ring' : 'BrainRing' }}</h1>
+          <h1>{{ view === 'register' ? 'Create an account' : 'BrainRing' }}</h1>
           <p class="auth-tagline">
             {{
               view === 'register'
-                ? 'a brighter morning starts here'
+                ? 'Build a more intentional morning routine.'
                 : 'the alarm you can’t just snooze'
             }}
           </p>
@@ -449,7 +465,7 @@ onUnmounted(() => {
                     'Password reset isn’t available yet. Keep your password somewhere safe.'
                 "
               >
-                forgot?
+                Forgot password?
               </button>
             </div>
             <p v-if="error" class="message error-message" role="alert">
@@ -463,10 +479,10 @@ onUnmounted(() => {
             >
               {{
                 busy
-                  ? 'one little moment…'
+                  ? 'Please wait'
                   : view === 'register'
-                    ? 'make my account'
-                    : 'ring me in'
+                    ? 'Create account'
+                    : 'Sign in'
               }}
             </button>
           </form>
@@ -478,8 +494,8 @@ onUnmounted(() => {
           >
             {{
               view === 'register'
-                ? '↩ already in the ring? sign in'
-                : '+ make an account'
+                ? '↩ Already have an account? Sign in'
+                : 'Create an account'
             }}
           </button>
           <svg class="squiggle" viewBox="0 0 112 15" aria-hidden="true">
@@ -489,7 +505,7 @@ onUnmounted(() => {
           </svg>
         </div>
         <p class="stage-caption">
-          less snoozing. more living. <span aria-hidden="true">☀</span>
+          A little focus. A better morning. <span aria-hidden="true">☀</span>
         </p>
       </main>
       <main v-else-if="view === 'home'" class="home-stage">
@@ -557,7 +573,7 @@ onUnmounted(() => {
             @click="ringNow"
             :disabled="busy"
           >
-            ring me! <span class="clock-emoji" aria-hidden="true">⏰</span>
+            Test alarm <span class="clock-emoji" aria-hidden="true">⏰</span>
           </button>
           <p
             v-if="error"
@@ -622,8 +638,8 @@ onUnmounted(() => {
           <p class="quiz-instructions">
             {{
               challenge.image
-                ? 'tap the right name to make it stop'
-                : 'tap the right answer to make it stop'
+                ? 'Select the correct name to dismiss the alarm.'
+                : 'Select the correct answer to dismiss the alarm.'
             }}
           </p>
           <button
@@ -652,7 +668,7 @@ onUnmounted(() => {
             {{ answerError }}
           </p>
         </div>
-        <p class="stage-caption">no snooze. just neurons.</p>
+        <p class="stage-caption">Complete the challenge to dismiss the alarm.</p>
       </main>
       <main v-else-if="view === 'success'" class="success-stage">
         <div class="success-card paper-card">
@@ -663,14 +679,14 @@ onUnmounted(() => {
             width="185"
             height="185"
           />
-          <p class="eyebrow">ALARM OFF. BRAIN ON.</p>
-          <h1>look who’s up!</h1>
-          <p>you beat the snooze.<br />go make today a good one.</p>
+          <p class="eyebrow">CHALLENGE COMPLETE</p>
+          <h1>Ready for the day</h1>
+          <p>Your alarm has been dismissed.<br />Have a productive morning.</p>
           <button
             class="button pink-button"
             @click="returnHome"
           >
-            back to my alarms <span aria-hidden="true">↗</span>
+            Back to alarms <span aria-hidden="true">↗</span>
           </button>
           <svg class="squiggle" viewBox="0 0 112 15" aria-hidden="true">
             <path
@@ -680,8 +696,8 @@ onUnmounted(() => {
         </div>
       </main>
       <footer class="site-footer">
-        <span>made for sleepy heads.</span
-        ><span>think before you snooze <span aria-hidden="true">↗</span></span>
+        <span>BrainRing</span
+        ><span>Wake up with intention <span aria-hidden="true">↗</span></span>
       </footer>
     </template>
     <dialog
@@ -703,7 +719,7 @@ onUnmounted(() => {
         <div class="dialog-heading">
           <h2 id="alarm-dialog-title">
             {{
-              editingId !== null ? 'a little adjustment' : 'a new wake-up call'
+              editingId !== null ? 'Edit alarm' : 'New alarm'
             }}
           </h2>
           <button
@@ -716,7 +732,7 @@ onUnmounted(() => {
             ×
           </button>
         </div>
-        <label class="field-label" for="alarm-time">what time?</label>
+        <label class="field-label" for="alarm-time">Time</label>
         <input
           id="alarm-time"
           v-model="form.time"
@@ -725,7 +741,7 @@ onUnmounted(() => {
           class="time-input"
         />
         <fieldset class="day-fieldset">
-          <legend>on these days <small>(none = once)</small></legend>
+          <legend>Repeat <small>(none = once)</small></legend>
           <div class="day-buttons">
             <button
               v-for="day in weekdays"
@@ -741,7 +757,7 @@ onUnmounted(() => {
           </div>
         </fieldset>
         <label class="field-label" for="alarm-mode"
-          >how awake do you want to be?</label
+          >Challenge difficulty</label
         >
         <select id="alarm-mode" v-model="form.mode">
           <option value="easy">Easy · a little addition</option>
@@ -749,13 +765,13 @@ onUnmounted(() => {
           <option value="hard">Hard · name that character</option>
         </select>
         <label class="field-label" for="alarm-label"
-          >give it a name <small>(optional)</small></label
+          >Label <small>(optional)</small></label
         >
         <input
           id="alarm-label"
           v-model="form.label"
           maxlength="60"
-          placeholder="morning, sleepyhead"
+          placeholder="e.g. Weekday morning"
         />
         <label class="editor-enabled"
           ><input v-model="form.enabled" type="checkbox" /> alarm on</label
@@ -764,7 +780,7 @@ onUnmounted(() => {
           {{ formError }}
         </p>
         <button type="submit" class="button pink-button" :disabled="busy">
-          {{ busy ? 'saving…' : 'save my alarm' }}
+          {{ busy ? 'saving…' : 'Save alarm' }}
         </button>
         <button
           v-if="editingId !== null"
