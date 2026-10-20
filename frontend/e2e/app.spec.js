@@ -3,14 +3,14 @@ import { test, expect } from '@playwright/test'
 async function register(page, name) {
   await page.goto('/')
   await page
-    .getByRole('button', { name: '+ make an account', exact: true })
+    .getByRole('button', { name: 'Create an account', exact: true })
     .click()
   await page
     .getByLabel('Your email', { exact: true })
     .fill(`${name}-${Date.now()}@example.com`)
   await page.getByLabel('Password', { exact: true }).fill('test-password-123')
   await page
-    .getByRole('button', { name: 'make my account', exact: true })
+    .getByRole('button', { name: 'Create account', exact: true })
     .click()
   await expect(
     page.getByRole('heading', { name: 'Your alarms' }),
@@ -46,12 +46,12 @@ test('prototype views, registration, saved alarm CRUD, challenge, reload, and lo
   await page.setViewportSize({ width: 390, height: 844 })
   const email = `ui-${Date.now()}@example.com`
   await page
-    .getByRole('button', { name: '+ make an account', exact: true })
+    .getByRole('button', { name: 'Create an account', exact: true })
     .click()
   await page.getByLabel('Your email', { exact: true }).fill(email)
   await page.getByLabel('Password', { exact: true }).fill('test-password-123')
   await page
-    .getByRole('button', { name: 'make my account', exact: true })
+    .getByRole('button', { name: 'Create account', exact: true })
     .click()
   await expect(page.locator('.alarm-card')).toHaveCount(2)
   await page.screenshot({
@@ -60,12 +60,12 @@ test('prototype views, registration, saved alarm CRUD, challenge, reload, and lo
   })
   await noOverflow(page)
   await page.getByRole('button', { name: '+ add alarm', exact: true }).click()
-  await page.getByLabel('what time?', { exact: true }).fill('07:45')
+  await page.getByLabel('Time', { exact: true }).fill('07:45')
   await page
-    .getByLabel('how awake do you want to be?', { exact: true })
+    .getByLabel('Challenge difficulty', { exact: true })
     .selectOption('easy')
-  await page.getByLabel('give it a name', { exact: false }).fill('school')
-  await page.getByRole('button', { name: 'save my alarm', exact: true }).click()
+  await page.getByLabel('Label', { exact: false }).fill('school')
+  await page.getByRole('button', { name: 'Save alarm', exact: true }).click()
   await expect(page.locator('.alarm-card')).toHaveCount(3)
   await page
     .getByRole('switch', { name: 'Turn off 7:45 AM alarm', exact: true })
@@ -81,8 +81,8 @@ test('prototype views, registration, saved alarm CRUD, challenge, reload, and lo
   await page
     .getByRole('button', { name: 'Edit 7:45 AM alarm', exact: true })
     .click()
-  await page.getByLabel('what time?', { exact: true }).fill('07:50')
-  await page.getByRole('button', { name: 'save my alarm', exact: true }).click()
+  await page.getByLabel('Time', { exact: true }).fill('07:50')
+  await page.getByRole('button', { name: 'Save alarm', exact: true }).click()
   await expect(
     page.getByRole('button', { name: 'Edit 7:50 AM alarm', exact: true }),
   ).toBeVisible()
@@ -93,7 +93,7 @@ test('prototype views, registration, saved alarm CRUD, challenge, reload, and lo
     .getByRole('button', { name: 'delete this alarm', exact: true })
     .click()
   await expect(page.locator('.alarm-card')).toHaveCount(2)
-  await page.getByRole('button', { name: 'ring me!', exact: false }).click()
+  await page.getByRole('button', { name: 'Test alarm', exact: false }).click()
   await expect(
     page.getByRole('heading', { name: 'who dis?!', exact: true }),
   ).toBeVisible()
@@ -105,7 +105,9 @@ test('prototype views, registration, saved alarm CRUD, challenge, reload, and lo
   await page
     .getByRole('button', { name: 'A Tralalero Tralala', exact: true })
     .click()
-  await expect(page.getByRole('alert')).toContainText('not quite!')
+  await expect(page.getByRole('alert')).toContainText(
+    'Incorrect answer. Please try again.',
+  )
   await page.reload()
   await expect(
     page.getByRole('heading', { name: 'who dis?!', exact: true }),
@@ -114,19 +116,19 @@ test('prototype views, registration, saved alarm CRUD, challenge, reload, and lo
     .getByRole('button', { name: 'C Tung Tung Tung Sahur', exact: true })
     .click()
   await expect(
-    page.getByRole('heading', { name: 'look who’s up!', exact: true }),
+    page.getByRole('heading', { name: 'Ready for the day', exact: true }),
   ).toBeVisible()
   await page.screenshot({
     path: testInfo.outputPath('success-mobile.png'),
     fullPage: true,
   })
   await page
-    .getByRole('button', { name: 'back to my alarms', exact: false })
+    .getByRole('button', { name: 'Back to alarms', exact: false })
     .click()
   await page.getByRole('button', { name: 'sign out', exact: false }).click()
   await page.getByLabel('Your email', { exact: true }).fill(email)
   await page.getByLabel('Password', { exact: true }).fill('test-password-123')
-  await page.getByRole('button', { name: 'ring me in', exact: true }).click()
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click()
   await expect(page.locator('.alarm-card')).toHaveCount(2)
   await page.setViewportSize({ width: 320, height: 740 })
   await noOverflow(page)
@@ -146,24 +148,43 @@ test('scheduled weekday alarm fires; one-time easy alarm disables itself', async
     .getByRole('button', { name: 'C Tung Tung Tung Sahur', exact: true })
     .click()
   await page
-    .getByRole('button', { name: 'back to my alarms', exact: false })
+    .getByRole('button', { name: 'Back to alarms', exact: false })
     .click()
   await page.getByRole('button', { name: '+ add alarm', exact: true }).click()
-  await page.getByLabel('what time?', { exact: true }).fill('06:31')
+  await page.getByLabel('Time', { exact: true }).fill('06:31')
   await page
-    .getByLabel('how awake do you want to be?', { exact: true })
+    .getByLabel('Challenge difficulty', { exact: true })
     .selectOption('easy')
   for (const day of ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'])
     await page.getByRole('button', { name: day, exact: true }).click()
-  await page.getByRole('button', { name: 'save my alarm', exact: true }).click()
+  await page.getByRole('button', { name: 'Save alarm', exact: true }).click()
   await expect(page.locator('.alarm-card')).toHaveCount(3)
   await page.clock.fastForward(60000)
   await expect(page.getByText('7 + 8 = ?', { exact: true })).toBeVisible()
   await page.getByRole('button', { name: 'B 15', exact: true }).click()
   await page
-    .getByRole('button', { name: 'back to my alarms', exact: false })
+    .getByRole('button', { name: 'Back to alarms', exact: false })
     .click()
   await expect(
     page.getByRole('switch', { name: 'Turn on 6:31 AM alarm', exact: true }),
   ).toHaveAttribute('aria-checked', 'false')
+})
+
+test('shows friendly auth feedback when backend is unavailable', async ({
+  page,
+}) => {
+  await page.route('**/api/**', (route) => route.abort())
+  await page.goto('/')
+  await expect(
+    page.getByText(
+      'BrainRing server is offline. Start backend, then try signing in.',
+      { exact: true },
+    ),
+  ).toBeVisible()
+  await page.getByLabel('Your email', { exact: true }).fill('offline@example.com')
+  await page.getByLabel('Password', { exact: true }).fill('test-password-123')
+  await page.getByRole('button', { name: 'Sign in', exact: true }).click()
+  await expect(page.getByRole('alert')).toContainText(
+    'Cannot reach BrainRing server. Start backend and try again.',
+  )
 })

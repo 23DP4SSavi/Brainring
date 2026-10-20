@@ -16,6 +16,7 @@ const booting = ref(true)
 const busy = ref(false)
 const error = ref('')
 const notice = ref('')
+const apiOffline = ref(false)
 const email = ref('')
 const password = ref('')
 const showPassword = ref(false)
@@ -112,6 +113,7 @@ async function submitAuth() {
   busy.value = true
   error.value = ''
   notice.value = ''
+  const isLogin = view.value !== 'register'
   try {
     const result = await api(
       `/auth/${view.value === 'register' ? 'register' : 'login'}`,
@@ -124,12 +126,23 @@ async function submitAuth() {
         },
       },
     )
+    apiOffline.value = false
     user.value = result.user
     view.value = 'home'
     password.value = ''
     await loadAccount()
   } catch (cause) {
-    error.value = cause.message
+    if (cause.code === 'NETWORK') {
+      apiOffline.value = true
+      error.value =
+        'Cannot reach BrainRing server. Start backend and try again.'
+    } else if (cause.status >= 500) {
+      error.value = 'BrainRing server had an error. Please try again shortly.'
+    } else if (isLogin && cause.status === 401) {
+      error.value = 'Email or password is incorrect.'
+    } else {
+      error.value = cause.message
+    }
   } finally {
     busy.value = false
   }
@@ -328,12 +341,23 @@ async function tick() {
 }
 onMounted(async () => {
   try {
+    await api('/health')
+    apiOffline.value = false
+  } catch {
+    apiOffline.value = true
+  }
+  try {
     const result = await api('/auth/me')
     user.value = result.user
     view.value = 'home'
     await loadAccount()
   } catch (cause) {
-    if (cause.status !== 401) error.value = cause.message
+    if (cause.code === 'NETWORK') {
+      apiOffline.value = true
+      error.value = ''
+    } else if (cause.status !== 401) {
+      error.value = cause.message
+    }
   } finally {
     booting.value = false
   }
@@ -390,7 +414,7 @@ onUnmounted(() => {
           :aria-label="theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
           @click="toggleTheme"
         >
-          {{ theme === 'dark' ? 'White mode' : 'Black mode' }}
+          {{ theme === 'dark' ? 'Light mode' : 'Dark mode' }}
         </button>
       </header>
       <main v-if="!user" class="auth-stage">
@@ -470,6 +494,9 @@ onUnmounted(() => {
             </div>
             <p v-if="error" class="message error-message" role="alert">
               {{ error }}
+            </p>
+            <p v-else-if="apiOffline" class="message" role="status">
+              BrainRing server is offline. Start backend, then try signing in.
             </p>
             <p v-if="notice" class="message" role="status">{{ notice }}</p>
             <button

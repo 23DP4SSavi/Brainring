@@ -17,6 +17,7 @@ npm.cmd --prefix backend start
 Atver **http://localhost:3000**. Nospied **+ make an account** un izveido savu kontu.
 Parolei jābūt vismaz 8 rakstzīmēm. Jaunam kontam ir prototipa parauga modinātāji
 6:30 darba dienās un 8:15 sestdienā. Katrs lietotājs redz tikai savus modinātājus.
+Projektā nav iepriekš izveidota demo konta; pirmajā palaišanā izveido jaunu kontu.
 
 ## Darbs ar kodu
 
