@@ -442,16 +442,28 @@ onUnmounted(() => {
           sign out <span aria-hidden="true">↗</span>
         </button>
         <span v-else class="header-note">Start your day with focus.</span>
-        <button
-          type="button"
-          class="theme-toggle"
-          :aria-pressed="theme === 'dark'"
-          :aria-label="theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
-          @click="toggleTheme"
-        >
-          {{ theme === 'dark' ? 'Light mode' : 'Dark mode' }}
-        </button>
-        <button v-if="user && ['home', 'account'].includes(view)" type="button" class="theme-toggle" @click="view = view === 'account' ? 'home' : 'account'">{{ view === 'account' ? 'Alarms' : 'Profile & settings' }}</button>
+        <div class="header-actions">
+          <button
+            type="button"
+            class="theme-toggle"
+            :aria-pressed="theme === 'dark'"
+            :aria-label="theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
+            @click="toggleTheme"
+          >
+            <span class="theme-toggle-track" aria-hidden="true">
+              <span class="theme-toggle-thumb"></span>
+            </span>
+            <span class="theme-toggle-text">{{ theme === 'dark' ? 'Light' : 'Dark' }}</span>
+          </button>
+          <button
+            v-if="user && ['home', 'account'].includes(view)"
+            type="button"
+            class="theme-toggle profile-toggle"
+            @click="view = view === 'account' ? 'home' : 'account'"
+          >
+            {{ view === 'account' ? 'Alarms' : 'Account & settings' }}
+          </button>
+        </div>
       </header>
       <main v-if="user && view === 'account'" class="settings-stage"><AccountPanel :user="user" @close="returnHome" /></main>
       <main v-else-if="!user" class="auth-stage">
@@ -775,8 +787,9 @@ onUnmounted(() => {
         </div>
       </main>
       <footer class="site-footer">
-        <span>BrainRing</span
-        ><span>Wake up with intention <span aria-hidden="true">↗</span></span>
+        <span>BrainRing</span>
+        <span>Wake up with intention <span aria-hidden="true">↗</span></span>
+        <span>© 2026 BrainRing. All rights reserved.</span>
       </footer>
     </template>
     <dialog
