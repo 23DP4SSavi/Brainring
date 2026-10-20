@@ -1,6 +1,8 @@
 <script setup>
 import { computed, nextTick, onMounted, onUnmounted, ref } from 'vue'
 import { api } from './api'
+import AccountPanel from './AccountPanel.vue'
+import { readLocal, writeLocal, profileKey, soundKey, validProfile } from './local-settings'
 import { useAlarmSound } from './audio'
 
 const theme = ref(document.documentElement.dataset.theme || 'light')
@@ -9,6 +11,21 @@ function toggleTheme() {
   document.documentElement.dataset.theme = theme.value
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme.value === 'dark' ? '#111111' : '#f5f5f5')
   try { localStorage.setItem('brainring-theme', theme.value) } catch { /* Storage is optional. */ }
+}
+const registration = ref({ firstName: '', lastName: '', username: '' })
+const repeatPassword = ref('')
+const typedAnswer = ref('')
+const soundChoice = ref('classic')
+const soundVolume = ref(80)
+function configureAlarmSound(alarmId) {
+  const config = readLocal(soundKey(user.value.id, alarmId), { tone: 'classic', volume: 80 })
+  sound.configure(config)
+}
+async function submitTypedAnswer() {
+  const normalize = value => value.normalize('NFKC').trim().replace(/\s+/g, ' ').toLocaleLowerCase()
+  const index = challenge.value.options.findIndex(option => normalize(option) === normalize(typedAnswer.value))
+  if (index < 0) { answerError.value = 'Incorrect answer. Please try again.'; return }
+  await answer(index)
 }
 const user = ref(null)
 const view = ref('login')
@@ -103,12 +120,20 @@ async function loadAccount() {
   alarms.value = saved
   challenge.value = active
   if (active) {
+    typedAnswer.value = ''
+    configureAlarmSound(readLocal('brainring-active-alarm-' + user.value.id, 'test'))
     view.value = 'challenge'
     sound.start()
   } else view.value = 'home'
 }
 async function submitAuth() {
   if (busy.value) return
+  if (view.value === 'register') {
+    if (!validProfile(registration.value)) { error.value = 'Enter first and last names and a username of 5-25 letters or digits.'; return }
+    if (!/[a-z]/.test(password.value) || !/[A-Z]/.test(password.value) || !/[0-9]/.test(password.value) || !/[^a-zA-Z0-9\s]/.test(password.value) || password.value.length < 8) { error.value = 'Use at least 8 characters including uppercase, lowercase, a number and a special character.'; return }
+    if (password.value !== repeatPassword.value) { error.value = 'Passwords do not match.'; return }
+  }
+  const registering = view.value === 'register'
   void sound.unlock()
   busy.value = true
   error.value = ''
@@ -128,6 +153,8 @@ async function submitAuth() {
     )
     apiOffline.value = false
     user.value = result.user
+    if (registering && !writeLocal(profileKey(result.user.id), { firstName: registration.value.firstName.trim(), lastName: registration.value.lastName.trim(), username: registration.value.username.trim() })) notice.value = 'Account created, but additional profile details could not be saved in this browser.'
+    repeatPassword.value = ''
     view.value = 'home'
     password.value = ''
     await loadAccount()
@@ -188,6 +215,9 @@ async function saveToggle(alarm) {
 }
 async function openAlarm(alarm) {
   editingId.value = alarm?.id ?? null
+  const config = readLocal(soundKey(user.value.id, alarm?.id ?? 'new'), { tone: 'classic', volume: 80 })
+  soundChoice.value = config.tone
+  soundVolume.value = config.volume
   form.value = alarm
     ? { ...alarm, days: [...alarm.days] }
     : {
@@ -212,15 +242,17 @@ async function saveAlarm() {
   formError.value = ''
   try {
     const editing = editingId.value !== null
-    await api(editing ? `/alarms/${editingId.value}` : '/alarms', {
+    const saved = await api(editing ? `/alarms/${editingId.value}` : '/alarms', {
       method: editing ? 'PUT' : 'POST',
       body: form.value,
     })
+    const soundSaved = writeLocal(soundKey(user.value.id, saved.id), { tone: soundChoice.value, volume: Number(soundVolume.value) })
     alarms.value = await api('/alarms')
     dialog.value.close()
     notice.value = editing
       ? 'alarm updated. future you says thanks.'
-      : 'alarm saved. see you in the morning!'
+      : 'Alarm saved.'
+    if (!soundSaved) notice.value += ' Sound settings could not be saved in this browser.'
   } catch (cause) {
     formError.value = cause.message
   } finally {
@@ -251,6 +283,9 @@ async function ring(alarm = null) {
       method: 'POST',
       body: alarm ? { alarmId: alarm.id } : { mode: 'hard' },
     })
+    typedAnswer.value = ''
+    writeLocal('brainring-active-alarm-' + user.value.id, alarm?.id ?? 'test')
+    configureAlarmSound(alarm?.id ?? 'test')
     wrongAnswer.value = null
     answerError.value = ''
     notice.value = ''
@@ -305,7 +340,7 @@ async function tick() {
   now.value = new Date()
   if (
     !user.value ||
-    !['home', 'success'].includes(view.value) ||
+    !['home', 'success', 'account'].includes(view.value) ||
     busy.value ||
     triggerPending
   )
@@ -416,8 +451,10 @@ onUnmounted(() => {
         >
           {{ theme === 'dark' ? 'Light mode' : 'Dark mode' }}
         </button>
+        <button v-if="user && ['home', 'account'].includes(view)" type="button" class="theme-toggle" @click="view = view === 'account' ? 'home' : 'account'">{{ view === 'account' ? 'Alarms' : 'Profile & settings' }}</button>
       </header>
-      <main v-if="!user" class="auth-stage">
+      <main v-if="user && view === 'account'" class="settings-stage"><AccountPanel :user="user" @close="returnHome" /></main>
+      <main v-else-if="!user" class="auth-stage">
         <div class="auth-card paper-card">
           <img
             class="auth-mascot"
@@ -436,6 +473,12 @@ onUnmounted(() => {
             }}
           </p>
           <form @submit.prevent="submitAuth" class="auth-form">
+            <template v-if="view === 'register'">
+              <label class="registration-label">First name<input v-model="registration.firstName" autocomplete="given-name" required maxlength="50" /></label>
+              <label class="registration-label">Last name<input v-model="registration.lastName" autocomplete="family-name" required maxlength="50" /></label>
+              <label class="registration-label">Username<input v-model="registration.username" autocomplete="username" required minlength="5" maxlength="25" pattern="[a-zA-Z0-9]{5,25}" title="5?25 letters or digits" /></label>
+              <p class="settings-note">Profile details are saved in this browser until profile synchronization is available. Username uniqueness is not yet checked.</p>
+            </template>
             <label class="sr-only" for="email">Your email</label>
             <input
               id="email"
@@ -443,7 +486,7 @@ onUnmounted(() => {
               type="email"
               autocomplete="email"
               placeholder="your email"
-              maxlength="254"
+              :maxlength="view === 'register' ? 100 : 254"
               required
             />
             <div class="password-field">
@@ -473,6 +516,10 @@ onUnmounted(() => {
                 {{ showPassword ? 'hide' : 'show' }}
               </button>
             </div>
+            <template v-if="view === 'register'">
+              <p class="settings-note">At least 8 characters, with uppercase and lowercase letters, a number and a special character.</p>
+              <label class="registration-label">Confirm password<input v-model="repeatPassword" type="password" autocomplete="new-password" required maxlength="128" /></label>
+            </template>
             <div class="auth-options">
               <label class="remember-label"
                 ><input v-model="remember" type="checkbox" /><span
@@ -665,7 +712,7 @@ onUnmounted(() => {
           <p class="quiz-instructions">
             {{
               challenge.image
-                ? 'Select the correct name to dismiss the alarm.'
+                ? 'Type the character name to dismiss the alarm.'
                 : 'Select the correct answer to dismiss the alarm.'
             }}
           </p>
@@ -676,7 +723,12 @@ onUnmounted(() => {
           >
             ♫ tap to start the alarm sound
           </button>
-          <div class="answer-options">
+          <form v-if="challenge.image" class="settings-form typed-answer" @submit.prevent="submitTypedAnswer">
+            <label for="character-answer">Character name</label>
+            <input id="character-answer" v-model="typedAnswer" required maxlength="100" autocomplete="off" autocapitalize="off" :disabled="busy" />
+            <button type="submit" class="button pink-button" :disabled="busy">Check answer</button>
+          </form>
+          <div v-else class="answer-options">
             <button
               v-for="(option, index) in challenge.options"
               :key="index"
@@ -800,6 +852,11 @@ onUnmounted(() => {
           maxlength="60"
           placeholder="e.g. Weekday morning"
         />
+        <label class="field-label" for="alarm-tone">Alarm sound</label>
+        <select id="alarm-tone" v-model="soundChoice"><option value="classic">Classic chime</option><option value="digital">Digital pulse</option><option value="bell">Bell</option></select>
+        <label class="field-label" for="alarm-volume">Volume: {{ soundVolume }}%</label>
+        <input id="alarm-volume" v-model="soundVolume" type="range" min="10" max="100" step="5" />
+        <p class="settings-note">Sound preferences are stored per alarm in this browser. Device volume also affects loudness.</p>
         <label class="editor-enabled"
           ><input v-model="form.enabled" type="checkbox" /> alarm on</label
         >

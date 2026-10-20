@@ -5,6 +5,11 @@ export function useAlarmSound() {
   const ringing = ref(false)
   const oscillators = new Set()
   let context, timer
+  let tone = 'classic', volume = 0.8
+  function configure(config = {}) {
+    tone = ['classic', 'digital', 'bell'].includes(config.tone) ? config.tone : 'classic'
+    volume = Math.min(1, Math.max(0.1, Number(config.volume) / 100 || 0.8))
+  }
   async function unlock() {
     try {
       if (!context) {
@@ -30,10 +35,10 @@ export function useAlarmSound() {
       const oscillator = context.createOscillator()
       const gain = context.createGain()
       const at = context.currentTime + i * 0.17
-      oscillator.type = 'sine'
-      oscillator.frequency.value = i % 2 ? 1046 : 784
+      oscillator.type = tone === 'digital' ? 'square' : 'sine'
+      oscillator.frequency.value = tone === 'bell' ? (i % 2 ? 1568 : 1175) : (i % 2 ? 1046 : 784)
       gain.gain.setValueAtTime(0, at)
-      gain.gain.linearRampToValueAtTime(0.16, at + 0.015)
+      gain.gain.linearRampToValueAtTime((tone === 'digital' ? 0.12 : 0.2) * volume, at + 0.015)
       gain.gain.exponentialRampToValueAtTime(0.001, at + 0.14)
       oscillator.connect(gain)
       gain.connect(context.destination)
@@ -73,5 +78,5 @@ export function useAlarmSound() {
     stop()
     context?.close()
   }
-  return { ready, ringing, unlock, enable, start, stop, dispose }
+  return { configure, ready, ringing, unlock, enable, start, stop, dispose }
 }
