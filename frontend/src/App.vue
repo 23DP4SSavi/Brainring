@@ -465,7 +465,7 @@ onUnmounted(() => {
           </button>
         </div>
       </header>
-      <main v-if="user && view === 'account'" class="settings-stage"><AccountPanel :user="user" @close="returnHome" /></main>
+      <main v-if="user && view === 'account'" class="settings-stage"><AccountPanel :user="user" @close="returnHome" @logout="logout" /></main>
       <main v-else-if="!user" class="auth-stage">
         <div class="auth-card paper-card">
           <img

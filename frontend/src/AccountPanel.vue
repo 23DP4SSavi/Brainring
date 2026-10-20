@@ -4,7 +4,7 @@ import { api } from './api'
 import { readLocal, writeLocal, profileKey, validProfile } from './local-settings'
 
 const props = defineProps({ user: { type: Object, required: true } })
-const emit = defineEmits(['close'])
+const emit = defineEmits(['close', 'logout'])
 const tab = ref('profile')
 const profile = ref(
   readLocal(profileKey(props.user.id), {
@@ -163,6 +163,18 @@ async function confirmAction() {
   }
   confirmation.value = null
 }
+
+async function deleteCurrentAccount() {
+  if (!props.user) return
+  try {
+    await api('/auth/me', { method: 'DELETE' })
+    confirmation.value = null
+    report('Account deleted. You have been signed out.', false)
+    emit('logout')
+  } catch (error) {
+    report(error.message, true)
+  }
+}
 </script>
 <template>
   <section class="account-panel paper-card" aria-labelledby="account-title">
@@ -181,7 +193,7 @@ async function confirmAction() {
         <label>Email<input :value="user.email" type="email" readonly /></label>
         <button class="button pink-button">Save profile</button>
       </form>
-      <section class="danger-zone"><h2>Delete account</h2><p class="settings-note">Server integration is pending. Account deletion is currently unavailable.</p><button class="button secondary-button" @click="confirmation = { kind: 'account' }">Review account deletion</button></section>
+      <section class="danger-zone"><h2>Delete account</h2><p class="settings-note">This permanently removes your account and all saved alarms. This action cannot be undone.</p><button class="button secondary-button" @click="confirmation = { kind: 'account' }">Review account deletion</button></section>
     </template>
     <template v-else-if="user.isAdmin">
         <p class="settings-note">Connected to backend admin API. You can search and delete regular users.</p>
@@ -201,9 +213,9 @@ async function confirmAction() {
       <p v-if="!images.length" class="settings-note">No images in the demonstration gallery.</p>
     </template>
     <section v-if="confirmation" class="confirmation-box" role="region" aria-labelledby="confirm-title">
-      <h2 id="confirm-title">{{ confirmation.kind === 'account' ? 'Account deletion unavailable' : 'Confirm deletion' }}</h2>
-      <p>{{ confirmation.kind === 'account' ? 'This action needs a server endpoint that securely deletes your account and related data. No data will be deleted.' : 'Remove ' + confirmation.name + ' from this demonstration?' }}</p>
-      <div class="confirmation-actions"><button class="button secondary-button" @click="confirmation = null">Cancel</button><button v-if="confirmation.kind !== 'account'" class="button pink-button" @click="confirmAction">Confirm deletion</button></div>
+      <h2 id="confirm-title">{{ confirmation.kind === 'account' ? 'Confirm account deletion' : 'Confirm deletion' }}</h2>
+      <p>{{ confirmation.kind === 'account' ? 'This will permanently delete your account and all saved alarms. You will be signed out immediately.' : 'Remove ' + confirmation.name + ' from this demonstration?' }}</p>
+      <div class="confirmation-actions"><button class="button secondary-button" @click="confirmation = null">Cancel</button><button v-if="confirmation.kind === 'account'" class="button pink-button" @click="deleteCurrentAccount">Delete account</button><button v-else class="button pink-button" @click="confirmAction">Confirm deletion</button></div>
     </section>
   </section>
 </template>

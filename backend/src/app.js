@@ -450,3 +450,20 @@ app.use((error, req, res, next) => {
   console.error(error)
   res.status(500).json({ error: 'Something went wrong. Please try again.' })
 })
+app.delete('/api/auth/me', authenticated, (req, res) => {
+  const userId = req.user.id
+  db.exec('BEGIN')
+  try {
+    db.prepare('DELETE FROM users WHERE id = ?').run(userId)
+    db.exec('COMMIT')
+  } catch (error) {
+    db.exec('ROLLBACK')
+    throw error
+  }
+  res.clearCookie('brainring_session', {
+    path: '/',
+    httpOnly: true,
+    sameSite: 'strict',
+  })
+  res.status(204).end()
+})
